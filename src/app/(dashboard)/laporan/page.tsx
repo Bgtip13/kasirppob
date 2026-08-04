@@ -12,6 +12,7 @@ type Tx = {
   type: string
   account_id: string | null
   cash_account_id: string | null
+  fee_account_id: string | null
   amount: number
   fee: number
   method: string | null
@@ -37,6 +38,7 @@ const TYPE_LABEL: Record<string, string> = {
   topup: 'Top Up',
   expense: 'Pengeluaran',
   piutang_payment: 'Bayar Piutang',
+  sale: 'Penjualan',
 }
 
 export default function LaporanPage() {
@@ -67,7 +69,9 @@ export default function LaporanPage() {
       supabase.from('accounts').select('id, name, type, balance').eq('is_active', true),
       supabase
         .from('transactions')
-        .select('id, type, account_id, cash_account_id, amount, fee, method, customer_name, note, category, date')
+        .select(
+          'id, type, account_id, cash_account_id, fee_account_id, amount, fee, method, customer_name, note, category, date'
+        )
         .gte('date', start)
         .lte('date', end)
         .order('date', { ascending: false }),
@@ -107,10 +111,13 @@ export default function LaporanPage() {
         } else if (tx.type === 'topup') {
           if (tx.account_id === acc.id) masuk += a
           if (tx.cash_account_id === acc.id) keluar += a
+          if (tx.fee_account_id === acc.id) masuk += Number(tx.fee)
         } else if (tx.type === 'expense') {
           if (tx.account_id === acc.id) keluar += a
         } else if (tx.type === 'piutang_payment') {
           if (tx.cash_account_id === acc.id) masuk += a
+        } else if (tx.type === 'sale') {
+          if (tx.account_id === acc.id) masuk += a
         }
       }
       const saldoAwal = Number(acc.balance) - (masuk - keluar)
@@ -159,7 +166,7 @@ export default function LaporanPage() {
       setEditing(null)
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      toast.error((err as any)?.message || 'Terjadi kesalahan')
     } finally {
       setLoading(false)
     }
@@ -178,7 +185,7 @@ export default function LaporanPage() {
       setPayAmount('')
       load()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      toast.error((err as any)?.message || 'Terjadi kesalahan')
     } finally {
       setLoading(false)
     }

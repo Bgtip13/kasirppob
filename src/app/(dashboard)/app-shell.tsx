@@ -11,6 +11,7 @@ const MENU = [
   { href: '/transaksi', label: 'Input Transaksi', icon: '💸' },
   { href: '/pengeluaran', label: 'Input Pengeluaran', icon: '📤' },
   { href: '/topup', label: 'Top Up Saldo', icon: '⬆️' },
+  { href: '/penjualan', label: 'Penjualan', icon: '🛒' },
   { href: '/laporan', label: 'Laporan Keuangan', icon: '📊' },
   { href: '/pengaturan', label: 'Pengaturan', icon: '⚙️' },
 ]
