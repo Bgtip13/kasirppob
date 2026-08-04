@@ -66,6 +66,16 @@ export default function RegisterPage() {
         <button disabled={loading} className="w-full rounded-lg bg-[#1B2A4A] py-2 font-medium text-white disabled:opacity-50">
           {loading ? 'Membuat...' : 'Buat Akun'}
         </button>
+        <p className="text-center text-sm text-gray-600">
+          Sudah punya akun?{' '}
+          <button
+            type="button"
+            onClick={() => router.push('/login')}
+            className="font-medium text-[#1B2A4A] underline"
+          >
+            Masuk di sini
+          </button>
+        </p>
       </form>
     </div>
   )

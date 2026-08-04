@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { createClient } from '@/lib/supabase/client'
-import BankLogo from '@/components/bank-logo'
 
 type Account = { id: string; name: string; default_fee_percent: number }
 
@@ -103,7 +102,7 @@ export default function TransaksiPage() {
       setFeeAuto(true)
       router.refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      toast.error((err as any)?.message || 'Terjadi kesalahan')
     } finally {
       setLoading(false)
     }
@@ -114,33 +113,42 @@ export default function TransaksiPage() {
       <h1 className="mb-4 text-xl font-bold">Input Transaksi</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-4 shadow">
-        <div>
+        <label className="block">
           <span className="text-sm text-gray-600">Rekening</span>
-          <div className="mt-1 space-y-2">
+          <select
+            value={accountId}
+            onChange={(e) => selectAccount(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+          >
             {accounts.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => selectAccount(a.id)}
-                className={`flex w-full items-center gap-3 rounded-xl border-2 px-3 py-2 text-left transition ${
-                  accountId === a.id ? 'border-sky-500 bg-sky-50' : 'border-gray-200 bg-white'
-                }`}
-              >
-                <BankLogo name={a.name} />
-                <span className="text-sm font-medium text-gray-800">{a.name}</span>
-              </button>
+              <option key={a.id} value={a.id}>{a.name}</option>
             ))}
-          </div>
-        </div>
+          </select>
+        </label>
 
         <label className="block">
           <span className="text-sm text-gray-600">Nominal Transfer</span>
-          <input type="number" inputMode="numeric" value={amount} onChange={(e) => handleAmountChange(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="0" required />
+          <input
+            type="number"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => handleAmountChange(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            placeholder="0"
+            required
+          />
         </label>
 
         <label className="block">
           <span className="text-sm text-gray-600">Biaya Admin / Fee</span>
-          <input type="number" inputMode="numeric" value={fee} onChange={(e) => handleFeeChange(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="0" />
+          <input
+            type="number"
+            inputMode="numeric"
+            value={fee}
+            onChange={(e) => handleFeeChange(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            placeholder="0"
+          />
           <span className="text-xs text-gray-400">
             Otomatis {selectedAccount?.default_fee_percent ?? 1}% dari nominal — bisa diubah manual
           </span>
@@ -152,14 +160,18 @@ export default function TransaksiPage() {
             <button
               type="button"
               onClick={() => setMethod('lunas')}
-              className={`rounded-lg py-2 text-sm font-medium ${method === 'lunas' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`rounded-lg py-2 text-sm font-medium ${
+                method === 'lunas' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-700'
+              }`}
             >
               Lunas / Tunai
             </button>
             <button
               type="button"
               onClick={() => setMethod('piutang')}
-              className={`rounded-lg py-2 text-sm font-medium ${method === 'piutang' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700'}`}
+              className={`rounded-lg py-2 text-sm font-medium ${
+                method === 'piutang' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700'
+              }`}
             >
               Piutang (Talangi)
             </button>
@@ -167,18 +179,35 @@ export default function TransaksiPage() {
         </div>
 
         <label className="block">
-          <span className="text-sm text-gray-600">Nama Customer {method === 'piutang' && <span className="text-red-500">*</span>}</span>
-          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Nama customer" />
+          <span className="text-sm text-gray-600">
+            Nama Customer {method === 'piutang' && <span className="text-red-500">*</span>}
+          </span>
+          <input
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            placeholder="Nama customer"
+          />
         </label>
 
         <label className="block">
           <span className="text-sm text-gray-600">Tanggal</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+          />
         </label>
 
         <label className="block">
           <span className="text-sm text-gray-600">Catatan</span>
-          <input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Opsional" />
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            placeholder="Opsional"
+          />
         </label>
 
         {Number(amount) > 0 && (
@@ -189,7 +218,10 @@ export default function TransaksiPage() {
           </p>
         )}
 
-        <button disabled={loading} className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50">
+        <button
+          disabled={loading}
+          className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50"
+        >
           {loading ? 'Menyimpan...' : 'Simpan Transaksi'}
         </button>
       </form>

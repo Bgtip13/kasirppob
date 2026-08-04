@@ -15,6 +15,7 @@ type Account = {
 
 export default function PengaturanPage() {
   const supabase = createClient()
+  const [open, setOpen] = useState<'pin' | 'kelola' | 'tambah' | null>(null)
 
   const [oldPin, setOldPin] = useState('')
   const [newPin, setNewPin] = useState('')
@@ -27,20 +28,22 @@ export default function PengaturanPage() {
   const [newType, setNewType] = useState<'bank' | 'cash'>('bank')
   const [newBalance, setNewBalance] = useState('')
 
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null)
+  const [editAccName, setEditAccName] = useState('')
+  const [editAccBalance, setEditAccBalance] = useState('')
+
   const [loading, setLoading] = useState(false)
 
   async function load() {
     const { data, error } = await supabase.from('accounts').select('*').order('name')
-    if (error) return
+    if (error) return toast.error(error.message)
     setAccounts((data ?? []) as Account[])
     const map: Record<string, string> = {}
     ;(data ?? []).forEach((a: Account) => (map[a.id] = String(a.default_fee_percent)))
     setFeeInputs(map)
   }
 
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [])
 
   async function changePin(e: React.FormEvent) {
     e.preventDefault()
@@ -55,14 +58,9 @@ export default function PengaturanPage() {
       const { error } = await supabase.auth.updateUser({ password: newPin })
       if (error) throw error
       toast.success('PIN berhasil diubah')
-      setOldPin('')
-      setNewPin('')
-      setConfirmPin('')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
-    } finally {
-      setLoading(false)
-    }
+      setOldPin(''); setNewPin(''); setConfirmPin('')
+    } catch (err) { toast.error((err as any)?.message || 'Terjadi kesalahan') }
+    finally { setLoading(false) }
   }
 
   async function saveFee(id: string) {
@@ -70,8 +68,7 @@ export default function PengaturanPage() {
     if (isNaN(n) || n < 0) return toast.error('Fee tidak valid')
     const { error } = await supabase.from('accounts').update({ default_fee_percent: n }).eq('id', id)
     if (error) return toast.error(error.message)
-    toast.success('Fee default diperbarui')
-    load()
+    toast.success('Fee default diperbarui'); load()
   }
 
   async function toggleActive(a: Account) {
@@ -79,114 +76,131 @@ export default function PengaturanPage() {
     load()
   }
 
+  function openEditAccount(a: Account) {
+    setEditingAccount(a); setEditAccName(a.name); setEditAccBalance(String(a.balance))
+  }
+
+  async function saveAccount() {
+    if (!editingAccount) return
+    if (!editAccName.trim()) return toast.error('Nama rekening wajib diisi')
+    setLoading(true)
+    try {
+      const { error } = await supabase.from('accounts')
+        .update({ name: editAccName.trim(), balance: Number(editAccBalance || 0) })
+        .eq('id', editingAccount.id)
+      if (error) throw error
+      toast.success('Rekening diperbarui'); setEditingAccount(null); load()
+    } catch (err) { toast.error((err as any)?.message || 'Terjadi kesalahan') }
+    finally { setLoading(false) }
+  }
+
   async function addAccount(e: React.FormEvent) {
     e.preventDefault()
     if (!newName.trim()) return toast.error('Nama rekening wajib diisi')
     setLoading(true)
     try {
-      const { error } = await supabase.rpc('add_account', {
-        p_name: newName.trim(),
-        p_type: newType,
-        p_initial_balance: Number(newBalance || 0),
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Sesi tidak ditemukan')
+      const { error } = await supabase.from('accounts').insert({
+        user_id: user.id, name: newName.trim(), type: newType, balance: Number(newBalance || 0),
       })
       if (error) throw error
       toast.success('Rekening ditambahkan')
-      setNewName('')
-      setNewBalance('')
-      load()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
-    } finally {
-      setLoading(false)
-    }
+      setNewName(''); setNewType('bank'); setNewBalance(''); setOpen(null); load()
+    } catch (err) { toast.error((err as any)?.message || 'Terjadi kesalahan') }
+    finally { setLoading(false) }
+  }
+
+  const Section = ({ id, title, children }: { id: 'pin' | 'kelola' | 'tambah'; title: string; children: React.ReactNode }) => {
+    const isOpen = open === id
+    return (
+      <div className="rounded-2xl bg-white shadow">
+        <button onClick={() => setOpen(isOpen ? null : id)}
+          className="flex w-full items-center justify-between px-4 py-3">
+          <span className="text-sm font-semibold text-gray-800">{title}</span>
+          <span className={`text-lg font-bold text-sky-500 transition-transform ${isOpen ? 'rotate-45' : ''}`}>+</span>
+        </button>
+        {isOpen && <div className="space-y-3 border-t px-4 py-4">{children}</div>}
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold">Pengaturan</h1>
+    <div className="space-y-3">
+      <Section id="pin" title="🔒 Ubah PIN Login">
+        <form onSubmit={changePin} className="space-y-2">
+          <input type="password" inputMode="numeric" placeholder="PIN lama"
+            value={oldPin} onChange={(e) => setOldPin(e.target.value)} className="w-full rounded-lg border px-3 py-2" />
+          <input type="password" inputMode="numeric" placeholder="PIN baru (min 6 digit)"
+            value={newPin} onChange={(e) => setNewPin(e.target.value)} className="w-full rounded-lg border px-3 py-2" />
+          <input type="password" inputMode="numeric" placeholder="Ulangi PIN baru"
+            value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} className="w-full rounded-lg border px-3 py-2" />
+          <button disabled={loading} className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50">
+            {loading ? 'Menyimpan...' : 'Ubah PIN'}
+          </button>
+        </form>
+      </Section>
 
-      <form onSubmit={changePin} className="space-y-3 rounded-2xl bg-white p-4 shadow">
-        <h2 className="text-sm font-semibold">Ubah PIN Login</h2>
-        <input
-          type="password"
-          inputMode="numeric"
-          placeholder="PIN lama"
-          value={oldPin}
-          onChange={(e) => setOldPin(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <input
-          type="password"
-          inputMode="numeric"
-          placeholder="PIN baru (min 6 digit)"
-          value={newPin}
-          onChange={(e) => setNewPin(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <input
-          type="password"
-          inputMode="numeric"
-          placeholder="Ulangi PIN baru"
-          value={confirmPin}
-          onChange={(e) => setConfirmPin(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <button disabled={loading} className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50">
-          {loading ? 'Menyimpan...' : 'Ubah PIN'}
-        </button>
-      </form>
-
-      <div className="space-y-3 rounded-2xl bg-white p-4 shadow">
-        <h2 className="text-sm font-semibold">Kelola Rekening & Fee Default</h2>
-        {accounts.map((a) => (
-          <div key={a.id} className="flex items-center gap-2 border-b pb-2">
-            <div className="flex-1">
-              <p className="text-sm font-medium">{a.name}</p>
-              <p className="text-xs text-gray-500">
-                {a.type === 'cash' ? 'Tunai' : 'Bank'} · {a.is_active ? 'Aktif' : 'Nonaktif'}
-              </p>
+      <Section id="kelola" title="🏦 Kelola Rekening">
+        <div className="space-y-2">
+          {accounts.map((a) => (
+            <div key={a.id} className="rounded-xl border p-3">
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <p className="font-medium">{a.name} {!a.is_active && <span className="text-xs text-gray-400">(nonaktif)</span>}</p>
+                  <p className="text-xs text-gray-500">{a.type === 'cash' ? 'Tunai' : 'Bank'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => openEditAccount(a)} className="text-blue-600">Edit</button>
+                  <button onClick={() => toggleActive(a)} className={a.is_active ? 'text-red-600' : 'text-green-600'}>
+                    {a.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 flex items-end gap-2">
+                <input value={feeInputs[a.id] ?? ''} onChange={(e) => setFeeInputs({ ...feeInputs, [a.id]: e.target.value })}
+                  inputMode="numeric" placeholder="Fee %" className="w-24 rounded-lg border px-2 py-1 text-sm" />
+                <button onClick={() => saveFee(a.id)} className="rounded-lg bg-gray-800 px-3 py-1 text-xs text-white">Simpan Fee</button>
+              </div>
             </div>
-            <input
-              type="number"
-              value={feeInputs[a.id] ?? ''}
-              onChange={(e) => setFeeInputs({ ...feeInputs, [a.id]: e.target.value })}
-              className="w-20 rounded-lg border px-2 py-1 text-sm"
-              title="Fee default (%)"
-            />
-            <button onClick={() => saveFee(a.id)} className="rounded-lg bg-gray-100 px-2 py-1 text-sm">
-              Simpan %
-            </button>
-            <button onClick={() => toggleActive(a)} className="rounded-lg bg-gray-100 px-2 py-1 text-sm">
-              {a.is_active ? 'Nonaktif' : 'Aktif'}
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </Section>
 
-      <form onSubmit={addAccount} className="space-y-3 rounded-2xl bg-white p-4 shadow">
-        <h2 className="text-sm font-semibold">Tambah Rekening</h2>
-        <input
-          placeholder="Nama rekening (mis. BCA)"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <select value={newType} onChange={(e) => setNewType(e.target.value as 'bank' | 'cash')} className="w-full rounded-lg border px-3 py-2">
-          <option value="bank">Bank</option>
-          <option value="cash">Tunai</option>
-        </select>
-        <input
-          type="number"
-          inputMode="numeric"
-          placeholder="Saldo awal"
-          value={newBalance}
-          onChange={(e) => setNewBalance(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2"
-        />
-        <button disabled={loading} className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50">
-          {loading ? 'Menyimpan...' : 'Tambah Rekening'}
-        </button>
-      </form>
+      <Section id="tambah" title="➕ Tambah Rekening">
+        <form onSubmit={addAccount} className="space-y-2">
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nama rekening (mis. BCA, DANA)"
+            className="w-full rounded-lg border px-3 py-2" />
+          <select value={newType} onChange={(e) => setNewType(e.target.value as 'bank' | 'cash')}
+            className="w-full rounded-lg border px-3 py-2">
+            <option value="bank">Bank / E-Wallet</option>
+            <option value="cash">Tunai / Cash</option>
+          </select>
+          <input value={newBalance} onChange={(e) => setNewBalance(e.target.value)} inputMode="numeric" placeholder="Saldo awal"
+            className="w-full rounded-lg border px-3 py-2" />
+          <button disabled={loading} className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50">
+            {loading ? 'Menyimpan...' : 'Simpan Rekening'}
+          </button>
+        </form>
+      </Section>
+
+      {editingAccount && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <div className="w-full max-w-md space-y-2 rounded-2xl bg-white p-4">
+            <h3 className="text-sm font-semibold">Edit Rekening</h3>
+            <input value={editAccName} onChange={(e) => setEditAccName(e.target.value)} placeholder="Nama rekening"
+              className="w-full rounded-lg border px-3 py-2" />
+            <input value={editAccBalance} onChange={(e) => setEditAccBalance(e.target.value)} inputMode="numeric" placeholder="Saldo"
+              className="w-full rounded-lg border px-3 py-2" />
+            <div className="flex gap-2">
+              <button onClick={saveAccount} disabled={loading} className="flex-1 rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50">
+                {loading ? 'Menyimpan...' : 'Simpan'}
+              </button>
+              <button onClick={() => setEditingAccount(null)} className="flex-1 rounded-lg bg-gray-200 py-2">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

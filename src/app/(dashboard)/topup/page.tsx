@@ -63,7 +63,7 @@ export default function TopupPage() {
       setNote('')
       router.refresh()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
+      toast.error((err as any)?.message || 'Terjadi kesalahan')
     } finally {
       setLoading(false)
     }
