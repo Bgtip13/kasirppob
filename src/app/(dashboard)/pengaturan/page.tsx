@@ -13,6 +13,18 @@ type Account = {
   is_active: boolean
 }
 
+function Section({ open, title, onToggle, children }: { open: boolean; title: string; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-white shadow">
+      <button onClick={onToggle} className="flex w-full items-center justify-between px-4 py-3">
+        <span className="text-sm font-semibold text-gray-800">{title}</span>
+        <span className={`text-lg font-bold text-sky-500 transition-transform ${open ? 'rotate-45' : ''}`}>+</span>
+      </button>
+      {open && <div className="space-y-3 border-t px-4 py-4">{children}</div>}
+    </div>
+  )
+}
+
 export default function PengaturanPage() {
   const supabase = createClient()
   const [open, setOpen] = useState<'pin' | 'kelola' | 'tambah' | null>(null)
@@ -111,23 +123,10 @@ export default function PengaturanPage() {
     finally { setLoading(false) }
   }
 
-  const Section = ({ id, title, children }: { id: 'pin' | 'kelola' | 'tambah'; title: string; children: React.ReactNode }) => {
-    const isOpen = open === id
-    return (
-      <div className="rounded-2xl bg-white shadow">
-        <button onClick={() => setOpen(isOpen ? null : id)}
-          className="flex w-full items-center justify-between px-4 py-3">
-          <span className="text-sm font-semibold text-gray-800">{title}</span>
-          <span className={`text-lg font-bold text-sky-500 transition-transform ${isOpen ? 'rotate-45' : ''}`}>+</span>
-        </button>
-        {isOpen && <div className="space-y-3 border-t px-4 py-4">{children}</div>}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-3">
-      <Section id="pin" title="🔒 Ubah PIN Login">
+      <Section open={open === 'pin'} title="🔒 Ubah PIN Login"
+        onToggle={() => setOpen(open === 'pin' ? null : 'pin')}>
         <form onSubmit={changePin} className="space-y-2">
           <input type="password" inputMode="numeric" placeholder="PIN lama"
             value={oldPin} onChange={(e) => setOldPin(e.target.value)} className="w-full rounded-lg border px-3 py-2" />
@@ -141,7 +140,8 @@ export default function PengaturanPage() {
         </form>
       </Section>
 
-      <Section id="kelola" title="🏦 Kelola Rekening">
+      <Section open={open === 'kelola'} title="🏦 Kelola Rekening"
+        onToggle={() => setOpen(open === 'kelola' ? null : 'kelola')}>
         <div className="space-y-2">
           {accounts.map((a) => (
             <div key={a.id} className="rounded-xl border p-3">
@@ -167,7 +167,8 @@ export default function PengaturanPage() {
         </div>
       </Section>
 
-      <Section id="tambah" title="➕ Tambah Rekening">
+      <Section open={open === 'tambah'} title="➕ Tambah Rekening"
+        onToggle={() => setOpen(open === 'tambah' ? null : 'tambah')}>
         <form onSubmit={addAccount} className="space-y-2">
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nama rekening (mis. BCA, DANA)"
             className="w-full rounded-lg border px-3 py-2" />
