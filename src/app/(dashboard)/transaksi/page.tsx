@@ -15,6 +15,13 @@ function formatRp(n: number) {
   }).format(n)
 }
 
+// Format angka dengan titik ribuan saat diketik: 1000 -> "1.000"
+function formatIdrInput(v: string): string {
+  const digits = v.replace(/\D/g, '')
+  if (!digits) return ''
+  return Number(digits).toLocaleString('id-ID')
+}
+
 export default function TransaksiPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -47,18 +54,21 @@ export default function TransaksiPage() {
   const selectedAccount = accounts.find((a) => a.id === accountId)
 
   function handleAmountChange(value: string) {
-    setAmount(value)
+    const formatted = formatIdrInput(value)
+    setAmount(formatted)
     if (feeAuto && selectedAccount) {
-      const n = Number(value)
+      const n = Number(formatted.replace(/\D/g, ''))
       if (!isNaN(n) && n > 0) {
         const pct = selectedAccount.default_fee_percent ?? 1
-        setFee(String(Math.round((n * pct) / 100)))
+        setFee(formatIdrInput(String(Math.round((n * pct) / 100))))
+      } else {
+        setFee('')
       }
     }
   }
 
   function handleFeeChange(value: string) {
-    setFee(value)
+    setFee(formatIdrInput(value))
     setFeeAuto(false)
   }
 
@@ -71,8 +81,8 @@ export default function TransaksiPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    const nAmount = Number(amount)
-    const nFee = Number(fee || 0)
+    const nAmount = Number(amount.replace(/\D/g, ''))
+    const nFee = Number((fee || '').replace(/\D/g, '')) || 0
     if (!accountId) return toast.error('Pilih rekening dulu')
     if (isNaN(nAmount) || nAmount <= 0) return toast.error('Nominal harus lebih dari 0')
     if (isNaN(nFee) || nFee < 0) return toast.error('Fee tidak valid')
@@ -90,35 +100,37 @@ export default function TransaksiPage() {
         p_date: date,
       })
       if (error) throw error
-      toast.success(
-        method === 'lunas'
-          ? `Transaksi berhasil — Tunai masuk ${formatRp(nAmount + nFee)}`
-          : `Transaksi berhasil — Piutang ${formatRp(nAmount + nFee)}`
-      )
+      toast.success('Transaksi berhasil disimpan')
       setAmount('')
       setFee('')
+      setFeeAuto(true)
       setCustomerName('')
       setNote('')
-      setFeeAuto(true)
+      setDate(new Date().toISOString().slice(0, 10))
       router.refresh()
     } catch (err) {
-      toast.error((err as any)?.message || 'Terjadi kesalahan')
+      toast.error(err instanceof Error ? err.message : 'Terjadi kesalahan')
     } finally {
       setLoading(false)
     }
   }
 
-  return (
-    <div>
-      <h1 className="mb-4 text-xl font-bold">Input Transaksi</h1>
+  const preview = (() => {
+    const a = Number(amount.replace(/\D/g, '')) || 0
+    const f = Number((fee || '').replace(/\D/g, '')) || 0
+    return a > 0 ? a + f : 0
+  })()
 
+  return (
+    <div className="mx-auto max-w-md space-y-4 p-4">
+      <h1 className="text-xl font-bold text-gray-800">Input Transaksi</h1>
       <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-4 shadow">
         <label className="block">
           <span className="text-sm text-gray-600">Rekening</span>
           <select
             value={accountId}
             onChange={(e) => selectAccount(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-gray-800"
           >
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
@@ -129,29 +141,24 @@ export default function TransaksiPage() {
         <label className="block">
           <span className="text-sm text-gray-600">Nominal Transfer</span>
           <input
-            type="number"
             inputMode="numeric"
             value={amount}
             onChange={(e) => handleAmountChange(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
             placeholder="0"
-            required
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-gray-800"
           />
         </label>
 
         <label className="block">
           <span className="text-sm text-gray-600">Biaya Admin / Fee</span>
           <input
-            type="number"
             inputMode="numeric"
             value={fee}
             onChange={(e) => handleFeeChange(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
             placeholder="0"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-gray-800"
           />
-          <span className="text-xs text-gray-400">
-            Otomatis {selectedAccount?.default_fee_percent ?? 1}% dari nominal — bisa diubah manual
-          </span>
+          <span className="text-xs text-gray-400">Otomatis 1% dari nominal — bisa diubah manual</span>
         </label>
 
         <div>
@@ -160,68 +167,46 @@ export default function TransaksiPage() {
             <button
               type="button"
               onClick={() => setMethod('lunas')}
-              className={`rounded-lg py-2 text-sm font-medium ${
-                method === 'lunas' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-700'
-              }`}
+              className={`rounded-lg py-2 text-sm font-medium ${method === 'lunas' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-700'}`}
             >
-              Lunas / Tunai
+              Lunas
             </button>
             <button
               type="button"
               onClick={() => setMethod('piutang')}
-              className={`rounded-lg py-2 text-sm font-medium ${
-                method === 'piutang' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700'
-              }`}
+              className={`rounded-lg py-2 text-sm font-medium ${method === 'piutang' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700'}`}
             >
-              Piutang (Talangi)
+              Piutang
             </button>
           </div>
         </div>
 
+        {method === 'piutang' && (
+          <label className="block">
+            <span className="text-sm text-gray-600">Nama Customer</span>
+            <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-gray-800" />
+          </label>
+        )}
+
         <label className="block">
-          <span className="text-sm text-gray-600">
-            Nama Customer {method === 'piutang' && <span className="text-red-500">*</span>}
-          </span>
-          <input
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-            placeholder="Nama customer"
-          />
+          <span className="text-sm text-gray-600">Catatan (opsional)</span>
+          <input value={note} onChange={(e) => setNote(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-gray-800" />
         </label>
 
         <label className="block">
           <span className="text-sm text-gray-600">Tanggal</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-          />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 text-gray-800" />
         </label>
 
-        <label className="block">
-          <span className="text-sm text-gray-600">Catatan</span>
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-            placeholder="Opsional"
-          />
-        </label>
-
-        {Number(amount) > 0 && (
+        {preview > 0 && (
           <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
             {method === 'lunas'
-              ? `Tunai yang diterima: ${formatRp(Number(amount) + Number(fee || 0))}`
-              : `Piutang ke customer: ${formatRp(Number(amount) + Number(fee || 0))}`}
+              ? `Tunai yang diterima: ${formatRp(preview)}`
+              : `Piutang ke customer: ${formatRp(preview)}`}
           </p>
         )}
 
-        <button
-          disabled={loading}
-          className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50"
-        >
+        <button disabled={loading} className="w-full rounded-lg bg-sky-500 py-2 font-medium text-white disabled:opacity-50">
           {loading ? 'Menyimpan...' : 'Simpan Transaksi'}
         </button>
       </form>
