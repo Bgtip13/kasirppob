@@ -69,6 +69,8 @@ export default function LaporanPage() {
     return m
   }, [items])
 
+  // ── Ringkasan keuangan ─────────────────────────────
+  // Laba Bersih = Total Fee + Laba Penjualan - Pengeluaran
   const summary = useMemo(() => {
     let fee = 0, pengeluaran = 0, penjualan = 0, cogs = 0
     txs.forEach((t) => {
@@ -79,7 +81,8 @@ export default function LaporanPage() {
         cogs += cogsMap[t.penjualan_id || ''] || 0
       }
     })
-    return { fee, pengeluaran, laba: penjualan - cogs - pengeluaran - fee }
+    const labaPenjualan = penjualan - cogs
+    return { fee, pengeluaran, labaPenjualan, laba: fee + labaPenjualan - pengeluaran }
   }, [txs, cogsMap])
 
   const mutasi = useMemo(() => accounts.map((acc) => {
@@ -201,6 +204,10 @@ export default function LaporanPage() {
         <Card label="Pengeluaran" value={summary.pengeluaran} color="text-red-600" />
         <Card label="Laba Bersih" value={summary.laba} color="text-green-600" />
       </div>
+
+      <p className="mt-1 text-center text-[11px] text-gray-400">
+        Total Fee {formatRp(summary.fee)} + Laba Penjualan {formatRp(summary.labaPenjualan)} − Pengeluaran {formatRp(summary.pengeluaran)} = Laba Bersih {formatRp(summary.laba)}
+      </p>
 
       <Section title="Mutasi Saldo per Akun" open={showMutasi} onToggle={() => setShowMutasi(!showMutasi)}>
         <div className="space-y-2">
